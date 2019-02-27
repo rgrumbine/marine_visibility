@@ -1,0 +1,30 @@
+#BSUB -J %E%fog_%CYC%
+#BSUB -o /com/output/%ENVIR%/today/fog_%CYC%.o%J
+#BSUB -L /bin/bash
+#BSUB -q prod
+#BSUB -W 00:30
+#BSUB -cwd /tmpnwprd
+#BSUB -P %PROJ%-%PROJENVIR%
+#BSUB -M 500
+
+%include <head.h>
+%include <envir-p1.h>
+
+export cyc=%CYC%
+
+model=global_fog
+%include <model_ver.h>
+
+$HOMEglobal_fog/jobs/JFOG
+
+%include <tail.h>
+
+%manual
+######################################################################
+TASKSCRIPT DOCUMENTATION BLOCK
+
+PURPOSE:  to produce global and northern hemispheric visibility
+          forecasts out to 168 hours.
+######################################################################
+%end
+

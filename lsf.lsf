@@ -1,0 +1,8 @@
+#!/bin/sh
+# #BSUB -L /bin/sh
+#BSUB -o fogout
+#BSUB -q "dev"
+#BSUB -P RTO-OPS
+#BSUB -W 0:30
+#BSUB -M 250
+./sms/sms.fake

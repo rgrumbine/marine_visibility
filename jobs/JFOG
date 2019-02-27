@@ -1,0 +1,136 @@
+#!/bin/sh
+
+set -x
+export PS4=' $SECONDS + ' 
+date
+####################################
+# 
+# obtain unique process id (pid) and make temp directories
+#
+####################################
+echo "cyc is ${cyc:?}"
+echo "envir is ${envir:?}"
+echo "global_fog_ver is ${global_fog_ver:?}" #ensure version is defined
+pid=$$
+jobid=${jobid:-${job}.$pid}
+export cycle=t${cyc}z
+
+if [ "$RUN_ENVIR" = 'nco' ]; then
+  DATAROOT=${DATAROOT:-/tmpnwprd1}
+else  #dev
+  DATAROOT=${DATAROOT:-/ptmpd2/wx21rg}
+fi
+
+export DATA=${DATAROOT}/$jobid
+mkdir $DATA
+cd $DATA 
+
+####################################
+# File To Log Msgs
+####################################
+if [ "$RUN_ENVIR" = 'nco' ]; then
+  if [ "$envir" = 'prod' ]; then
+    export jlogfile=${jlogfile:-/com/logs/jlogfiles/jlogfile.$jobid}
+  else
+    export jlogfile=/com/logs/${envir}/jlogfile
+  fi
+else  #dev
+  export jlogfile=~/jlogfile
+fi
+
+####################################
+# Determine Job Output Name on System
+####################################
+export outid="LL$job"
+export jobid="${outid}.o${pid}"
+export pgmout="OUTPUT.${pid}"
+
+####################################
+# variables that control processing
+# Determine variable settings before testing and set them accordingly
+#    SENDDBN=YES        file will be sent to OSO
+#    SENDCOM=YES        copy files from $DATA to $COMOUT
+#    SENDSMS=YES        Flag Events on SMS
+####################################
+export SENDCOM=YES
+export SENDECF=YES
+
+if [ "$envir" = "prod" ]; then
+  export SENDDBN=${SENDDBN:-YES}
+  export SENDDBN_NTC=${SENDDBN_NTC:-YES}
+else
+  export SENDDBN=${SENDDBN:-NO}
+  export SENDDBN_NTC=${SENDDBN_NTC:-NO}
+fi
+
+#################################################
+# Specify job's execution areas (directory paths)
+#################################################
+
+export NET=omb
+export RUN=fog
+
+#Path to home directory:
+if [ "$RUN_ENVIR" != 'nco' ]; then  #dev
+  NWROOT=${NWROOT:-/u/Robert.Grumbine/save}
+fi
+
+export HOMEglobal_fog=${HOMEglobal_fog:-${NWROOT}/global_fog.${global_fog_ver}}
+export EXECglobal_fog=$HOMEglobal_fog/exec
+
+###################################
+# Set up the UTILITIES
+###################################
+export utilscript=/nwprod/util/ush
+export utilexec=/nwprod/util/exec
+export utilparm=/nwprod/util/parm # the parm file grib2_awpnhvis.232 is used
+
+# Run setup to initialize working directory and utility scripts
+sh $utilscript/setup.sh
+
+# Run setpdy and initialize PDY variables
+sh $utilscript/setpdy.sh
+. ./PDY
+
+##############################################
+# Define COM directories
+##############################################
+if [ "$RUN_ENVIR" = 'nco' ]; then
+  com=${COMROOT:?}/${NET}/${envir}
+  export COMINgfs=/com2/gfs/prod/gfs.${PDY}
+  export COMINsst=/com/gfs/prod/sst.${PDYm1}
+  export PCOM=/pcom/${NET}
+else
+  com=/u/Robert.Grumbine/noscrub/com/${NET}/${envir}/
+  # export COMINgfs=/com2/gfs/prod/gfs.${PDY}
+  # for luna: export COMINgfs=/global/noscrub/emc.glopara/com/gfs/para/gfs.${PDY}
+  export COMINgfs=/gpfs/hps/ptmp/emc.glopara/com2/gfs/para/gfs.${PDY}
+  export COMINsst=/com/gfs/prod/sst.${PDYm1}
+  export PCOM=/u/Robert.Grumbine/noscrub/pcom/${NET}/
+fi
+
+export COMOUT=$com/${RUN}.${PDY}
+
+mkdir -p $COMOUT
+
+msg="HAS BEGUN on `hostname`"
+postmsg "$jlogfile" "$msg"
+
+env
+
+########################################################
+# Execute the script.
+sh $HOMEglobal_fog/scripts/exfog.sh
+export err=$?; err_chk
+########################################################
+
+if [ -e "$pgmout" ]; then
+  cat $pgmout
+fi
+
+if [ "${KEEPDATA^^}" != YES ]; then
+  rm -rf $DATA
+fi
+
+date
+
